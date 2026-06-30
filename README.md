@@ -1,4 +1,4 @@
-# 🛞 Simple Wheeler Menu
+# Simple Wheeler Menu
 
 A small, modern menu for changing **Wheeler's** keybinds and a few settings using [SKSE Menu Framework](https://www.nexusmods.com/skyrimspecialedition/mods/120352).
 
@@ -6,7 +6,7 @@ If you've used Wheeler before, its settings menu was handled by an older mod cal
 
 ---
 
-## ⚠️ Important
+## Important
 
 **This replaces dMenu for Wheeler users.**
 
