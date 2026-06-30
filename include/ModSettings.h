@@ -303,8 +303,8 @@ private:
 	static void show_cancelButton();
 
 	static void show_modSetting(mod_setting* mod);
-	static void show_entry(entry_base* base, mod_setting* mod);
-	static void show_entries(std::vector<entry_base*>& entries, mod_setting* mod);
+	static void show_entry(entry_base* base, mod_setting* mod, bool topLevel);
+	static void show_entries(std::vector<entry_base*>& entries, mod_setting* mod, bool topLevel);
 
 	static void SendSettingsUpdateEvent(std::string& modName);
 	static void send_mod_callback_event(std::string& mod_name, std::string& str_arg);

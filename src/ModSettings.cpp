@@ -286,7 +286,7 @@ void ModSettings::show_cancelButton()
 	}
 }
 
-void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
+void ModSettings::show_entry(entry_base* entry, mod_setting* mod, bool topLevel)
 {
 	im::PushID(entry);
 	bool edited = false;
@@ -411,13 +411,14 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 	case kEntryType_Group:
 		{
 			entry_group* g = dynamic_cast<entry_group*>(entry);
+			int flags = topLevel ? ImGuiMCP::ImGuiTreeNodeFlags_DefaultOpen : 0;
 			im::PushStyleColor(ImGuiMCP::ImGuiCol_Header, ImGuiMCP::ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-			if (im::CollapsingHeader(g->name.get())) {
+			if (im::CollapsingHeader(g->name.get(), flags)) {
 				if (im::IsItemHovered() && !g->desc.empty()) {
 					im::SetTooltip("%s", g->desc.get());
 				}
 				im::PopStyleColor();
-				show_entries(g->entries, mod);
+				show_entries(g->entries, mod, false);
 			} else {
 				im::PopStyleColor();
 			}
@@ -518,13 +519,13 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 	im::PopID();
 }
 
-void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* mod)
+void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* mod, bool topLevel)
 {
 	im::PushID(&entries);
 	for (auto& entry : entries) {
 		im::PushID(entry);
 		im::Indent();
-		show_entry(entry, mod);
+		show_entry(entry, mod, topLevel);
 		im::Unindent();
 		im::PopID();
 	}
@@ -533,7 +534,18 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 
 void ModSettings::show_modSetting(mod_setting* mod)
 {
-	show_entries(mod->entries, mod);
+	std::vector<entry_base*> flattened;
+	for (auto* entry : mod->entries) {
+		if (entry->is_group()) {
+			entry_group* g = dynamic_cast<entry_group*>(entry);
+			for (auto* child : g->entries) {
+				flattened.push_back(child);
+			}
+		} else {
+			flattened.push_back(entry);
+		}
+	}
+	show_entries(flattened, mod, true);
 }
 
 void ModSettings::show()
@@ -550,9 +562,7 @@ void ModSettings::show()
 
 	im::PushStyleColor(ImGuiMCP::ImGuiCol_Text, ImGuiMCP::ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 	for (auto& mod : mods) {
-		if (im::CollapsingHeader(mod->name.c_str())) {
-			show_modSetting(mod);
-		}
+		show_modSetting(mod);
 	}
 	im::PopStyleColor();
 	im::PopStyleVar(2);
