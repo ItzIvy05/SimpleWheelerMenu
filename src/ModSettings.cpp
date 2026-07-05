@@ -5,12 +5,8 @@
 #include <fstream>
 #include <stack>
 
-#include <Xinput.h>
-
 #include "SimpleIni.h"
 #include "logger.h"
-
-#pragma comment(lib, "Xinput.lib")
 
 namespace im = ImGuiMCP;
 
@@ -126,23 +122,6 @@ static bool SliderFloatWithSteps(const char* label, float* v, float v_min, float
 }
 
 static bool s_captureArmed = false;
-static WORD s_prevPadButtons = 0;
-static bool s_prevLT = false;
-static bool s_prevRT = false;
-
-static void ResetGamepadCapture()
-{
-	XINPUT_STATE state{};
-	if (XInputGetState(0, &state) == ERROR_SUCCESS) {
-		s_prevPadButtons = state.Gamepad.wButtons;
-		s_prevLT = state.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
-		s_prevRT = state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
-	} else {
-		s_prevPadButtons = 0;
-		s_prevLT = false;
-		s_prevRT = false;
-	}
-}
 
 static int PollCapturedInput()
 {
@@ -177,7 +156,15 @@ static int PollCapturedInput()
 		{ im::ImGuiKey_RightCtrl, 157 }, { im::ImGuiKey_KeypadDivide, 181 }, { im::ImGuiKey_PrintScreen, 183 }, { im::ImGuiKey_RightAlt, 184 },
 		{ im::ImGuiKey_Pause, 197 }, { im::ImGuiKey_Home, 199 }, { im::ImGuiKey_UpArrow, 200 }, { im::ImGuiKey_PageUp, 201 },
 		{ im::ImGuiKey_LeftArrow, 203 }, { im::ImGuiKey_RightArrow, 205 }, { im::ImGuiKey_End, 207 }, { im::ImGuiKey_DownArrow, 208 },
-		{ im::ImGuiKey_PageDown, 209 }, { im::ImGuiKey_Insert, 210 }, { im::ImGuiKey_Delete, 211 }
+		{ im::ImGuiKey_PageDown, 209 }, { im::ImGuiKey_Insert, 210 }, { im::ImGuiKey_Delete, 211 },
+		{ im::ImGuiKey_GamepadDpadUp, 266 }, { im::ImGuiKey_GamepadDpadDown, 267 },
+		{ im::ImGuiKey_GamepadDpadLeft, 268 }, { im::ImGuiKey_GamepadDpadRight, 269 },
+		{ im::ImGuiKey_GamepadStart, 270 }, { im::ImGuiKey_GamepadBack, 271 },
+		{ im::ImGuiKey_GamepadL3, 272 }, { im::ImGuiKey_GamepadR3, 273 },
+		{ im::ImGuiKey_GamepadL1, 274 }, { im::ImGuiKey_GamepadR1, 275 },
+		{ im::ImGuiKey_GamepadFaceDown, 276 }, { im::ImGuiKey_GamepadFaceRight, 277 },
+		{ im::ImGuiKey_GamepadFaceLeft, 278 }, { im::ImGuiKey_GamepadFaceUp, 279 },
+		{ im::ImGuiKey_GamepadL2, 280 }, { im::ImGuiKey_GamepadR2, 281 }
 	};
 	for (auto& m : keys) {
 		if (im::IsKeyPressed(static_cast<ImGuiMCP::ImGuiKey>(m.key), false)) {
@@ -206,45 +193,6 @@ static int PollCapturedInput()
 		}
 		if (io->MouseWheel < 0.0f) {
 			return 265;
-		}
-	}
-
-	XINPUT_STATE state{};
-	if (XInputGetState(0, &state) == ERROR_SUCCESS) {
-		struct PadMap
-		{
-			WORD mask;
-			int code;
-		};
-		static const PadMap pads[] = {
-			{ XINPUT_GAMEPAD_DPAD_UP, 266 }, { XINPUT_GAMEPAD_DPAD_DOWN, 267 },
-			{ XINPUT_GAMEPAD_DPAD_LEFT, 268 }, { XINPUT_GAMEPAD_DPAD_RIGHT, 269 },
-			{ XINPUT_GAMEPAD_START, 270 }, { XINPUT_GAMEPAD_BACK, 271 },
-			{ XINPUT_GAMEPAD_LEFT_THUMB, 272 }, { XINPUT_GAMEPAD_RIGHT_THUMB, 273 },
-			{ XINPUT_GAMEPAD_LEFT_SHOULDER, 274 }, { XINPUT_GAMEPAD_RIGHT_SHOULDER, 275 },
-			{ XINPUT_GAMEPAD_A, 276 }, { XINPUT_GAMEPAD_B, 277 },
-			{ XINPUT_GAMEPAD_X, 278 }, { XINPUT_GAMEPAD_Y, 279 }
-		};
-		WORD buttons = state.Gamepad.wButtons;
-		bool lt = state.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
-		bool rt = state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
-		int result = -1;
-		for (auto& p : pads) {
-			if ((buttons & p.mask) && !(s_prevPadButtons & p.mask)) {
-				result = p.code;
-			}
-		}
-		if (lt && !s_prevLT) {
-			result = 280;
-		}
-		if (rt && !s_prevRT) {
-			result = 281;
-		}
-		s_prevPadButtons = buttons;
-		s_prevLT = lt;
-		s_prevRT = rt;
-		if (result >= 0) {
-			return result;
 		}
 	}
 	return -1;
@@ -433,7 +381,6 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod, bool topLevel)
 				im::OpenPopup(popupId.data());
 				keyMapListening = k;
 				s_captureArmed = false;
-				ResetGamepadCapture();
 			}
 			im::SameLine();
 			if (im::Button("Unmap")) {
