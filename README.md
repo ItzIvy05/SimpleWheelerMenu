@@ -18,6 +18,8 @@ If you've used Wheeler before, its settings menu was handled by an older mod cal
 
 - Rebind every Wheeler control in-game (open wheel, next/previous wheel, activate, add wheel, and more)
 - Works with keyboard, mouse, **and** controller
+- Xbox and PlayStation controllers: button names follow the controller you're using, and bindings a PlayStation pad can't trigger in Wheeler are flagged
+- Supports Skyrim SE 1.5.97, AE 1.6.x and 1.7.x
 - Built on the modern **SKSE Menu Framework**
 - Stripped down and optimized with none of the extra clutter from the old menu
 

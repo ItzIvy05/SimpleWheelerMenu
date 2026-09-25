@@ -1,28 +1,18 @@
 #include "Menu.h"
-#include "ModSettings.h"
-#include "logger.h"
 
-void OnMessage(SKSE::MessagingInterface::Message* message)
+namespace
 {
-	switch (message->type) {
-	case SKSE::MessagingInterface::kDataLoaded:
-		try {
-			ModSettings::init();
-			Menu::Register();
-		} catch (const std::exception& e) {
-			logger::error("Simple Wheeler Menu startup failed: {}", e.what());
+	void OnMessage(SKSE::MessagingInterface::Message* a_message)
+	{
+		if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
+			Menu::Register(ModSettings::Load());
 		}
-		break;
-	default:
-		break;
 	}
 }
 
-SKSEPluginLoad(const SKSE::LoadInterface* skse)
+SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
-	SetupLog();
-	logger::info("Plugin loaded");
-	SKSE::Init(skse);
+	SKSE::Init(a_skse);
 	SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
 	return true;
 }
