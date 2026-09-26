@@ -2,165 +2,102 @@
 
 #include "KeyInput.h"
 
+#include <FUCK_API.h>
+
 namespace
 {
-	namespace im = ImGuiMCP;
-
+	constexpr std::uint32_t kGamepadOffset = 266;
 	constexpr auto kCapturePopup = "Remap Key###SimpleWheelerMenuCapture";
-	constexpr im::ImVec4 kWhite{ 1.0f, 1.0f, 1.0f, 1.0f };
-	constexpr im::ImVec4 kWarning{ 1.0f, 0.62f, 0.25f, 1.0f };
-	constexpr im::ImVec4 kTransparent{ 0.0f, 0.0f, 0.0f, 0.0f };
-	constexpr im::ImVec4 kSave{ 0.2f, 0.7f, 0.3f, 1.0f };
-	constexpr im::ImVec4 kSaveHovered{ 0.3f, 0.8f, 0.4f, 1.0f };
-	constexpr im::ImVec4 kSaveActive{ 0.4f, 0.9f, 0.5f, 1.0f };
+	constexpr ImVec4 kSave{ 0.2f, 0.7f, 0.3f, 1.0f };
+	constexpr ImVec4 kSaveHovered{ 0.3f, 0.8f, 0.4f, 1.0f };
+	constexpr ImVec4 kSaveActive{ 0.4f, 0.9f, 0.5f, 1.0f };
 
 	std::optional<ModSettings::Page> g_page;
 	ModSettings::Entry* g_captureTarget = nullptr;
-	bool g_playStation = false;
 
-	void Describe(const ModSettings::Entry& a_entry, std::string_view a_problem = {})
+	const char* KeyName(std::uint32_t a_code)
 	{
-		if (!a_problem.empty()) {
-			im::SetItemTooltip("%s\n\n%.*s", a_entry.desc.c_str(), static_cast<int>(a_problem.size()), a_problem.data());
-		} else if (!a_entry.desc.empty()) {
-			im::SetItemTooltip("%s", a_entry.desc.c_str());
+		switch (a_code) {
+		case 0:
+			return "Unmapped";
+		case 264:
+			return "Mouse Wheel Up";
+		case 265:
+			return "Mouse Wheel Down";
+		default:
+			break;
 		}
+		if (a_code >= kGamepadOffset) {
+			return FUCK::GetKeyName(a_code + kGamepadOffset);
+		}
+		return FUCK::GetKeyName(a_code);
 	}
 
 	void HelpMarker(const ModSettings::Entry& a_entry)
 	{
-		if (a_entry.desc.empty()) {
-			return;
+		if (!a_entry.desc.empty()) {
+			FUCK::SameLine();
+			FUCK::HelpMarker(a_entry.desc.c_str());
 		}
-		im::SameLine();
-		im::TextDisabled("(?)");
-		im::SetItemTooltip("%s", a_entry.desc.c_str());
 	}
 
-	bool ResetRequested(ModSettings::Entry& a_entry)
+	void DrawKeymap(ModSettings::Page& a_page, ModSettings::Entry& a_entry, ModSettings::Keymap& a_keymap)
 	{
-		if (im::IsKeyPressed(im::ImGuiKey_R, false) && im::IsItemHovered()) {
-			return ModSettings::Reset(a_entry);
-		}
-		return false;
-	}
-
-	bool DrawSlider(const ModSettings::Entry& a_entry, ModSettings::Slider& a_slider)
-	{
-		std::array<char, 32> text{};
-		std::snprintf(text.data(), text.size(), "%g", a_slider.value);
-		auto index = std::clamp(static_cast<int>(std::lround((a_slider.value - a_slider.min) / a_slider.step)), 0, a_slider.steps);
-		im::SetNextItemWidth(im::GetContentRegionAvail().x * 0.5f);
-		if (!im::SliderInt(a_entry.name.c_str(), &index, 0, a_slider.steps, text.data(), im::ImGuiSliderFlags_AlwaysClamp | im::ImGuiSliderFlags_NoInput)) {
-			return false;
-		}
-		a_slider.value = a_slider.min + static_cast<float>(index) * a_slider.step;
-		return true;
-	}
-
-	bool DrawWidget(ModSettings::Entry& a_entry)
-	{
-		bool edited = false;
-		if (auto* slider = std::get_if<ModSettings::Slider>(&a_entry.widget)) {
-			edited = DrawSlider(a_entry, *slider);
-		} else if (im::Button(a_entry.name.c_str())) {
-			ModSettings::Press(std::get<ModSettings::Button>(a_entry.widget));
-		}
-		Describe(a_entry);
-		edited = ResetRequested(a_entry) || edited;
-		HelpMarker(a_entry);
-		return edited;
-	}
-
-	void DrawKeymap(ModSettings::Page& a_page, ModSettings::Entry& a_entry)
-	{
-		auto& keymap = std::get<ModSettings::Keymap>(a_entry.widget);
-		const auto problem = KeyInput::Problem(keymap.value, keymap.gamepad, g_playStation);
-		im::PushID(std::addressof(a_entry));
-		im::TableNextRow();
-		im::TableNextColumn();
-		if (im::Button("Remap")) {
+		if (FUCK::Button("Remap")) {
 			g_captureTarget = std::addressof(a_entry);
 			KeyInput::Begin();
 		}
-		Describe(a_entry, problem);
-		if (ResetRequested(a_entry)) {
+		FUCK::SameLine();
+		if (FUCK::Button("Unmap")) {
+			a_keymap.value = 0;
 			a_page.dirty = true;
 		}
-		im::SameLine();
-		if (im::Button("Unmap")) {
-			keymap.value = 0;
+		FUCK::SameLine();
+		FUCK::Text("%s: %s", a_entry.name.c_str(), KeyName(a_keymap.value));
+	}
+
+	void DrawSlider(ModSettings::Page& a_page, ModSettings::Entry& a_entry, ModSettings::Slider& a_slider)
+	{
+		std::array<char, 32> text{};
+		std::snprintf(text.data(), text.size(), "%g", a_slider.value);
+		auto index = static_cast<int>(std::lround((a_slider.value - a_slider.min) / a_slider.step));
+		FUCK::SetNextItemWidth(FUCK::GetContentRegionAvail().x * 0.5f);
+		if (FUCK::SliderInt(a_entry.name.c_str(), &index, 0, a_slider.steps, text.data())) {
+			a_slider.value = a_slider.min + static_cast<float>(index) * a_slider.step;
 			a_page.dirty = true;
 		}
-		im::TableNextColumn();
-		im::AlignTextToFramePadding();
-		im::TextUnformatted(a_entry.name.c_str());
+		if (FUCK::IsKeyPressed(ImGuiKey_R, false) && FUCK::IsItemHovered() && std::exchange(a_slider.value, a_slider.fallback) != a_slider.fallback) {
+			a_page.dirty = true;
+		}
+	}
+
+	void DrawEntries(ModSettings::Page& a_page, std::span<ModSettings::Entry> a_entries, int a_headerFlags);
+
+	void DrawEntry(ModSettings::Page& a_page, ModSettings::Entry& a_entry, int a_headerFlags)
+	{
+		FUCK::PushID(std::addressof(a_entry));
+		if (auto* keymap = std::get_if<ModSettings::Keymap>(&a_entry.widget)) {
+			DrawKeymap(a_page, a_entry, *keymap);
+		} else if (auto* slider = std::get_if<ModSettings::Slider>(&a_entry.widget)) {
+			DrawSlider(a_page, a_entry, *slider);
+		} else if (auto* button = std::get_if<ModSettings::Button>(&a_entry.widget)) {
+			if (FUCK::Button(a_entry.name.c_str())) {
+				ModSettings::Press(*button);
+			}
+		} else if (FUCK::CollapsingHeader(a_entry.name.c_str(), a_headerFlags)) {
+			DrawEntries(a_page, a_entry.children, 0);
+		}
 		HelpMarker(a_entry);
-		im::TableNextColumn();
-		im::AlignTextToFramePadding();
-		const auto name = KeyInput::Name(keymap.value, g_playStation);
-		auto color = kWhite;
-		if (!problem.empty()) {
-			color = kWarning;
-		}
-		im::TextColored(color, "%.*s", static_cast<int>(name.size()), name.data());
-		Describe(a_entry, problem);
-		im::PopID();
+		FUCK::PopID();
 	}
 
-	std::size_t DrawKeymaps(ModSettings::Page& a_page, std::span<ModSettings::Entry> a_entries)
+	void DrawEntries(ModSettings::Page& a_page, std::span<ModSettings::Entry> a_entries, int a_headerFlags)
 	{
-		std::size_t count = 0;
-		while (count < a_entries.size() && std::holds_alternative<ModSettings::Keymap>(a_entries[count].widget)) {
-			++count;
+		FUCK::Indent();
+		for (auto& entry : a_entries) {
+			DrawEntry(a_page, entry, a_headerFlags);
 		}
-		im::PushID(a_entries.data());
-		if (im::BeginTable("##keymaps", 3, im::ImGuiTableFlags_SizingFixedFit | im::ImGuiTableFlags_NoSavedSettings)) {
-			for (auto& entry : a_entries.first(count)) {
-				DrawKeymap(a_page, entry);
-			}
-			im::EndTable();
-		}
-		im::PopID();
-		return count;
-	}
-
-	void DrawEntries(ModSettings::Page& a_page, std::span<ModSettings::Entry> a_entries, int a_depth);
-
-	void DrawGroup(ModSettings::Page& a_page, ModSettings::Entry& a_entry, int a_depth)
-	{
-		int flags = 0;
-		if (a_depth == 0) {
-			flags = im::ImGuiTreeNodeFlags_DefaultOpen;
-		}
-		im::PushStyleColor(im::ImGuiCol_Header, kTransparent);
-		const bool open = im::CollapsingHeader(a_entry.name.c_str(), flags);
-		im::PopStyleColor();
-		Describe(a_entry);
-		if (open) {
-			DrawEntries(a_page, a_entry.children, a_depth + 1);
-		}
-	}
-
-	void DrawEntries(ModSettings::Page& a_page, std::span<ModSettings::Entry> a_entries, int a_depth)
-	{
-		im::Indent();
-		for (std::size_t index = 0; index < a_entries.size();) {
-			auto& entry = a_entries[index];
-			if (std::holds_alternative<ModSettings::Keymap>(entry.widget)) {
-				index += DrawKeymaps(a_page, a_entries.subspan(index));
-				continue;
-			}
-			im::PushID(std::addressof(entry));
-			if (std::holds_alternative<ModSettings::Group>(entry.widget)) {
-				DrawGroup(a_page, entry, a_depth);
-			} else if (DrawWidget(entry)) {
-				a_page.dirty = true;
-			}
-			im::PopID();
-			++index;
-		}
-		im::Unindent();
+		FUCK::Unindent();
 	}
 
 	void DrawCapture(ModSettings::Page& a_page)
@@ -168,13 +105,14 @@ namespace
 		if (!g_captureTarget) {
 			return;
 		}
-		if (!im::IsPopupOpen(kCapturePopup)) {
-			im::OpenPopup(kCapturePopup);
+		if (!FUCK::IsPopupOpen(kCapturePopup)) {
+			FUCK::OpenPopup(kCapturePopup);
 		}
-		if (!im::BeginPopupModal(kCapturePopup, nullptr, im::ImGuiWindowFlags_AlwaysAutoResize | im::ImGuiWindowFlags_NoSavedSettings)) {
+		if (!FUCK::BeginPopupModal(kCapturePopup)) {
 			return;
 		}
-		im::TextUnformatted("Press any key, mouse button, wheel, or controller button to bind.");
+		FUCK::TextUnformatted("Press any key, mouse button, wheel, or controller button to bind.");
+		FUCK::TextUnformatted("(Esc binds Escape.)");
 		std::uint32_t code = 0;
 		const auto state = KeyInput::Poll(code);
 		if (state == KeyInput::State::kCaptured) {
@@ -183,63 +121,82 @@ namespace
 		}
 		if (state != KeyInput::State::kWaiting) {
 			g_captureTarget = nullptr;
-			im::CloseCurrentPopup();
+			FUCK::CloseCurrentPopup();
 		}
-		im::EndPopup();
+		FUCK::EndPopup();
 	}
 
 	void DrawToolbar(ModSettings::Page& a_page)
 	{
 		const bool dirty = a_page.dirty;
 		if (dirty) {
-			im::PushStyleColor(im::ImGuiCol_Button, kSave);
-			im::PushStyleColor(im::ImGuiCol_ButtonHovered, kSaveHovered);
-			im::PushStyleColor(im::ImGuiCol_ButtonActive, kSaveActive);
+			FUCK::PushStyleColor(ImGuiCol_Button, kSave);
+			FUCK::PushStyleColor(ImGuiCol_ButtonHovered, kSaveHovered);
+			FUCK::PushStyleColor(ImGuiCol_ButtonActive, kSaveActive);
 		}
-		if (im::Button("Save Changes") && dirty) {
+		if (FUCK::Button("Save Changes") && dirty) {
 			ModSettings::Save(a_page);
 		}
 		if (dirty) {
-			im::PopStyleColor(3);
+			FUCK::PopStyleColor(3);
 		}
-		im::SameLine();
-		if (im::Button("Revert") && dirty) {
+		FUCK::SameLine();
+		if (FUCK::Button("Revert") && dirty) {
 			ModSettings::Revert(a_page);
 		}
 	}
 
-	void __stdcall Render()
+	class SettingsPage : public FUCK::ITool
 	{
-		if (!g_page) {
-			im::TextWrapped("Wheeler Controls.json was not found in Data/SKSE/Plugins/dmenu/customSettings. Install Wheeler - Quick Action Wheel of Skyrim.");
-			return;
+	public:
+		const char* Name() const override
+		{
+			return "Settings";
 		}
-		g_playStation = KeyInput::IsPlayStation();
-		DrawToolbar(*g_page);
-		im::Separator();
-		im::PushStyleVar(im::ImGuiStyleVar_ItemSpacing, im::ImVec2{ 8.0f, 8.0f });
-		im::PushStyleColor(im::ImGuiCol_Text, kWhite);
-		for (auto& entry : g_page->entries) {
-			if (std::holds_alternative<ModSettings::Group>(entry.widget)) {
-				DrawEntries(*g_page, entry.children, 0);
-			} else {
-				DrawEntries(*g_page, std::span(std::addressof(entry), 1), 0);
+
+		const char* Group() const override
+		{
+			return "Simple Wheeler Menu";
+		}
+
+		void Draw() override
+		{
+			if (!g_page) {
+				FUCK::TextWrapped("Wheeler Controls.json was not found in Data/SKSE/Plugins/dmenu/customSettings. Install Wheeler - Quick Action Wheel of Skyrim.");
+				return;
 			}
+			DrawToolbar(*g_page);
+			FUCK::Separator();
+			for (auto& entry : g_page->entries) {
+				if (std::holds_alternative<ModSettings::Group>(entry.widget)) {
+					DrawEntries(*g_page, entry.children, ImGuiTreeNodeFlags_DefaultOpen);
+				} else {
+					DrawEntries(*g_page, std::span(std::addressof(entry), 1), ImGuiTreeNodeFlags_DefaultOpen);
+				}
+			}
+			DrawCapture(*g_page);
 		}
-		DrawCapture(*g_page);
-		im::PopStyleColor();
-		im::PopStyleVar();
-	}
+
+		void OnClose() override
+		{
+			KeyInput::Cancel();
+		}
+
+		bool OnAsyncInput(const void* a_events) override
+		{
+			return KeyInput::Process(static_cast<const RE::InputEvent* const*>(a_events));
+		}
+	};
+
+	SettingsPage g_settingsPage;
 }
 
 void Menu::Register(std::optional<ModSettings::Page> a_page)
 {
 	g_page = std::move(a_page);
-	if (!SKSEMenuFramework::IsInstalled()) {
-		logger::warn("SKSE Menu Framework is not installed; Simple Wheeler Menu has no UI.");
+	if (!FUCK::Connect(SKSE::GetPluginName().data())) {
+		logger::warn("FLICK is not installed; Simple Wheeler Menu has no UI.");
 		return;
 	}
-	SKSEMenuFramework::SetSection("Simple Wheeler Menu");
-	SKSEMenuFramework::AddSectionItem("Settings", Render);
-	KeyInput::Install();
+	FUCK::RegisterTool(std::addressof(g_settingsPage));
 }

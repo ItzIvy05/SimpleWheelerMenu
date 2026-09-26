@@ -57,7 +57,7 @@ namespace ModSettings
 			return slider;
 		}
 
-		std::optional<Widget> ParseWidget(const json& a_json, std::string_view a_section)
+		std::optional<Widget> ParseWidget(const json& a_json)
 		{
 			const auto type = a_json.value("type", ""s);
 			if (type == "group") {
@@ -68,7 +68,7 @@ namespace ModSettings
 			}
 			if (type == "keymap") {
 				const auto fallback = a_json.value("default", 0u);
-				return Keymap{ fallback, fallback, a_section.contains("GamePad") };
+				return Keymap{ fallback, fallback };
 			}
 			if (type == "button") {
 				return Button{ a_json.value("id", ""s) };
@@ -82,12 +82,11 @@ namespace ModSettings
 				try {
 					const auto& text = Find(item, "text");
 					const auto& ini = Find(item, "ini");
-					auto section = ini.value("section", ""s);
-					auto widget = ParseWidget(item, section);
+					auto widget = ParseWidget(item);
 					if (!widget) {
 						continue;
 					}
-					auto& entry = a_entries.emplace_back(std::move(*widget), text.value("name", ""s), Summarize(text.value("desc", ""s)), std::move(section), ini.value("id", ""s));
+					auto& entry = a_entries.emplace_back(std::move(*widget), text.value("name", ""s), Summarize(text.value("desc", ""s)), ini.value("section", ""s), ini.value("id", ""s));
 					ParseEntries(Find(item, "entries"), entry.children);
 				} catch (const json::exception& e) {
 					logger::warn("Skipping malformed setting: {}", e.what());
@@ -123,27 +122,10 @@ namespace ModSettings
 			}
 		}
 
-		struct Resetter
-		{
-			template <class T>
-			bool operator()(T& a_widget) const
-			{
-				if constexpr (requires { a_widget.fallback; }) {
-					const bool changed = a_widget.value != a_widget.fallback;
-					a_widget.value = a_widget.fallback;
-					return changed;
-				} else {
-					return false;
-				}
-			}
-		};
-
 		void Send(const std::string& a_event, const std::string& a_arg)
 		{
-			if (auto* source = SKSE::GetModCallbackEventSource()) {
-				SKSE::ModCallbackEvent event{ a_event, a_arg, 0.0f, nullptr };
-				source->SendEvent(std::addressof(event));
-			}
+			SKSE::ModCallbackEvent event{ a_event, a_arg, 0.0f, nullptr };
+			SKSE::GetModCallbackEventSource()->SendEvent(std::addressof(event));
 		}
 
 		void Queue(std::string a_event, std::string a_arg)
@@ -188,11 +170,6 @@ namespace ModSettings
 		ini.LoadFile(a_page.ini.c_str());
 		Read(ini, a_page.entries);
 		a_page.dirty = false;
-	}
-
-	bool Reset(Entry& a_entry)
-	{
-		return std::visit(Resetter{}, a_entry.widget);
 	}
 
 	void Press(const Button& a_button)

@@ -19,7 +19,6 @@ namespace ModSettings
 	{
 		std::uint32_t value = 0;
 		std::uint32_t fallback = 0;
-		bool gamepad = false;
 	};
 
 	struct Button
@@ -47,6 +46,5 @@ namespace ModSettings
 	std::optional<Page> Load();
 	void Save(Page& a_page);
 	void Revert(Page& a_page);
-	bool Reset(Entry& a_entry);
 	void Press(const Button& a_button);
 }

@@ -9,11 +9,8 @@ namespace KeyInput
 		kCaptured
 	};
 
-	void Install();
 	void Begin();
+	void Cancel();
 	State Poll(std::uint32_t& a_code);
-
-	bool IsPlayStation();
-	std::string_view Name(std::uint32_t a_code, bool a_playStation);
-	std::string_view Problem(std::uint32_t a_code, bool a_gamepad, bool a_playStation);
+	bool Process(const RE::InputEvent* const* a_events);
 }
